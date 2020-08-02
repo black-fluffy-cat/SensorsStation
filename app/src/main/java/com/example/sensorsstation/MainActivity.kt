@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 
 
 class MainActivity : AppCompatActivity() {
@@ -21,6 +22,7 @@ class MainActivity : AppCompatActivity() {
     private var bluetoothSocket: BluetoothSocket? = null
     private var shouldReceiveData: Boolean = true
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 200)
+    private var threadShouldRun = AtomicBoolean(true)
     private var fullMessageCentimeters = Int.MAX_VALUE.toString()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,10 +39,13 @@ class MainActivity : AppCompatActivity() {
         connectToHC06Button.setOnClickListener { connectToUltraHC06() }
         closeSocketButton.setOnClickListener { closeBluetoothSocket() }
         startReceivingDataButton.setOnClickListener {
+            threadShouldRun.set(true)
             Thread {
-                while (bluetoothSocket != null) {
+                while (threadShouldRun.get()) {
                     processMessageToSpeaker()
+                    Log.d("ABAB", "threadShouldRun is: ${threadShouldRun.get()}")
                 }
+                toneGenerator.stopTone()
                 Log.d("ABAB", "Thread is exiting")
             }.start()
             shouldReceiveData = true
@@ -90,7 +95,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        stopReceivingDataButton.setOnClickListener { shouldReceiveData = false }
+
+        stopReceivingDataButton.setOnClickListener {
+            threadShouldRun.set(false)
+            shouldReceiveData = false
+        }
+
         startBeepButton.setOnClickListener {
             toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
         }
