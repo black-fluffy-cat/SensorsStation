@@ -66,9 +66,9 @@ class MainActivity : AppCompatActivity() {
         return null
     }
 
-    private fun onDataReceived(message: String) {
+    private fun onDataReceived(receivedUnits: ReceivedUnits) {
         runOnUiThread {
-            distanceLabel.text = "$message cm"
+            distanceLabel.text = "${receivedUnits.distanceCm} cm\n ${receivedUnits.temperatureC} °C"
         }
     }
 

@@ -11,16 +11,16 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
-class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
-                       private val onDataReceived: (String) -> Unit) {
+data class ReceivedUnits(val distanceCm: Int, val temperatureC: Int)
 
-    private var fullMessageCentimeters = Int.MAX_VALUE.toString()
+class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
+                       private val onDataReceived: (ReceivedUnits) -> Unit) {
+
+    private var fullMessageCentimeters = Int.MAX_VALUE
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 200)
     private var shouldReceiveData = AtomicBoolean(true)
     private var threadShouldRun = AtomicBoolean(true)
 
-    private val receiveBuffer = ByteArray(1024)
-    private var amountOfReceivedBytes: Int = 0
     private var partialMessage = ""
 
     fun startTone() {
@@ -34,46 +34,30 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
 
     fun startReceivingData() {
         threadShouldRun.set(true)
-//        startSpeakerThread()
+        startSpeakerThread()
         shouldReceiveData.set(true)
+        val receiveBuffer = ByteArray(1024)
         bluetoothSocket?.let { socket ->
             CoroutineScope(Dispatchers.IO).launch {
                 withContext(Dispatchers.IO) {
-
-
                     while (shouldReceiveData.get()) {
                         Log.d("ABAB", "Trying to receive data...")
-                        val message = try {
-                            amountOfReceivedBytes = socket.inputStream.read(receiveBuffer)
+                        val receivedMessage = try {
+                            val amountOfReceivedBytes = socket.inputStream.read(receiveBuffer)
                             String(receiveBuffer, 0, amountOfReceivedBytes)
                         } catch (e: IOException) {
-                            e.printStackTrace()
                             Log.e("ABAB", "error", e)
-                            shouldReceiveData.set(false)
-                            "IO Exception"
+                            null
                         }
-                        Log.d("ABAB",
-                            "message: $message, length: ${message.length}, comparison: ${message[message.length - 1]} == #")
-                        if (message[message.length - 1].toString() == "#") {
-                            var fullMessage = (partialMessage + message)
-                            if (fullMessage.count { it.toString() == "#" } > 1) {
-                                val fullMessageLength = fullMessage.length
-                                var positionOfAlmostLastHash = 0
-                                for (i in fullMessageLength - 2 downTo 0) {
-                                    if (fullMessage[i].toString() == "#") {
-                                        positionOfAlmostLastHash = i
-                                        break
-                                    }
-                                }
-                                fullMessage = fullMessage.substring(positionOfAlmostLastHash,
-                                    fullMessageLength)
+
+                        receivedMessage?.let { rcvMsg ->
+                            Log.d("ABAB", "message: $rcvMsg, length: " + "${rcvMsg.length}")
+                            val cleanFullMessage = processReceivedMessage(receivedMessage)
+                            cleanFullMessage?.let { message ->
+                                val receivedUnits = processCleanMessage(message)
+                                fullMessageCentimeters = receivedUnits.distanceCm
+                                onDataReceived(receivedUnits)
                             }
-                            fullMessage = fullMessage.replace("#", "")
-                            fullMessageCentimeters = fullMessage
-                            partialMessage = ""
-                            onDataReceived(fullMessage)
-                        } else {
-                            partialMessage = message
                         }
                     }
                 }
@@ -81,9 +65,37 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
         }
     }
 
-    fun stopReceivingData() {
-        threadShouldRun.set(false)
-        shouldReceiveData.set(false)
+    private fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
+        val splitMessage = cleanMessage.split(delimiter)
+        return ReceivedUnits(splitMessage[0].toInt(), splitMessage[1].toInt())
+    }
+
+    /***
+     * @return message if message is complete, null if received message is partial
+     *
+     */
+    private fun processReceivedMessage(receivedMessage: String): String? {
+        if (receivedMessage[receivedMessage.length - 1].toString() == "#") {
+            var fullMessage = (partialMessage + receivedMessage)
+            if (fullMessage.count { it.toString() == "#" } > 1) {
+                val fullMessageLength = fullMessage.length
+                var positionOfAlmostLastHash = 0
+                for (i in fullMessageLength - 2 downTo 0) {
+                    if (fullMessage[i].toString() == "#") {
+                        positionOfAlmostLastHash = i
+                        break
+                    }
+                }
+                fullMessage = fullMessage.substring(positionOfAlmostLastHash,
+                    fullMessageLength)
+            }
+            val cleanLastFullMessage = fullMessage.replace("#", "")
+            partialMessage = ""
+            return cleanLastFullMessage
+        } else {
+            partialMessage = receivedMessage
+            return null
+        }
     }
 
     private fun startSpeakerThread() {
@@ -99,7 +111,7 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
 
     private fun processMessageToSpeaker() {
         //TODO try catch
-        val centimeters = fullMessageCentimeters.toInt()
+        val centimeters = fullMessageCentimeters
 
         when {
             centimeters <= 5 -> toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
@@ -123,6 +135,11 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
                 }
             }
         }
+    }
+
+    fun stopReceivingData() {
+        threadShouldRun.set(false)
+        shouldReceiveData.set(false)
     }
 
     fun destroy() {
