@@ -10,11 +10,11 @@
         android:id="@+id/connectToHC06Button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
         android:text="Connect to ultraHC06"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@+id/distanceLabel" />
 
     <Button
         android:id="@+id/closeSocketButton"
@@ -50,12 +50,13 @@
         android:id="@+id/distanceLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="128dp"
         android:text="TextView"
         android:textSize="36sp"
-        app:layout_constraintBottom_toTopOf="@+id/connectToHC06Button"
-        app:layout_constraintEnd_toEndOf="@+id/connectToHC06Button"
-        app:layout_constraintStart_toStartOf="@+id/connectToHC06Button" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.100000024" />
 
     <Button
         android:id="@+id/startBeepButton"
