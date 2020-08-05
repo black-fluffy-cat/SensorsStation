@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class ReceivedUnits(val distanceCm: Int, val temperatureC: Int)
+data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int)
 
 class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
                        private val onDataReceived: (ReceivedUnits) -> Unit) {
@@ -67,7 +67,7 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
 
     private fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
         val splitMessage = cleanMessage.split(delimiter)
-        return ReceivedUnits(splitMessage[0].toInt(), splitMessage[1].toInt())
+        return ReceivedUnits(splitMessage[0].toInt(), splitMessage[1].toInt(), splitMessage[2].toInt())
     }
 
     /***
