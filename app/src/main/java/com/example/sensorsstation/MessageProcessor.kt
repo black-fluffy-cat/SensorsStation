@@ -14,13 +14,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int,
                          val solarPanelVoltage: Float)
 
-class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
+class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
                        private val onDataReceived: (ReceivedUnits) -> Unit) {
 
     private var fullMessageCentimeters = Int.MAX_VALUE
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 200)
-    private var shouldReceiveData = AtomicBoolean(true)
-    private var threadShouldRun = AtomicBoolean(true)
+    private val shouldReceiveData = AtomicBoolean(true)
+    private val isReceivingData = AtomicBoolean(false)
 
     private var partialMessage = ""
 
@@ -34,17 +34,17 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
     }
 
     fun startReceivingData() {
-        threadShouldRun.set(true)
-        startSpeakerThread()
-        shouldReceiveData.set(true)
-        val receiveBuffer = ByteArray(1024)
-        bluetoothSocket?.let { socket ->
+        if (isReceivingData.compareAndSet(false, true)) {
+            startSpeakerThread()
+            shouldReceiveData.set(true)
+            val receiveBuffer = ByteArray(1024)
             CoroutineScope(Dispatchers.IO).launch {
                 withContext(Dispatchers.IO) {
                     while (shouldReceiveData.get()) {
                         Log.d("ABAB", "Trying to receive data...")
                         val receivedMessage = try {
-                            val amountOfReceivedBytes = socket.inputStream.read(receiveBuffer)
+                            val amountOfReceivedBytes =
+                                bluetoothSocket.inputStream.read(receiveBuffer)
                             String(receiveBuffer, 0, amountOfReceivedBytes)
                         } catch (e: IOException) {
                             Log.e("ABAB", "error", e)
@@ -112,7 +112,7 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
 
     private fun startSpeakerThread() {
         Thread {
-            while (threadShouldRun.get()) {
+            while (isReceivingData.get()) {
                 processMessageToSpeaker()
 //                Log.d("ABAB", "threadShouldRun is: ${threadShouldRun.get()}")
             }
@@ -150,12 +150,11 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
     }
 
     fun stopReceivingData() {
-        threadShouldRun.set(false)
         shouldReceiveData.set(false)
+        isReceivingData.set(false)
     }
 
     fun destroy() {
-        shouldReceiveData.set(false)
-        threadShouldRun.set(false)
+        stopReceivingData()
     }
 }

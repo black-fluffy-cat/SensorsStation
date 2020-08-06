@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
             CoroutineScope(Dispatchers.IO).launch {
                 connectToUltraHC06()?.let { socket ->
                     bluetoothSocket = socket
-                    messageProcessor = MessageProcessor(bluetoothSocket, ::onDataReceived)
+                    messageProcessor = MessageProcessor(socket, ::onDataReceived)
                 }
                 isConnectingToBluetooth.set(false)
                 runOnUiThread { connectingToBtInfoGroup.isVisible = false }
