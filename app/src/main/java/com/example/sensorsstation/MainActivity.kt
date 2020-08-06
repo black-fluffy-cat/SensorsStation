@@ -4,8 +4,14 @@ import android.bluetooth.BluetoothSocket
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 
 class MainActivity : AppCompatActivity() {
@@ -13,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private val bluetoothManager = BluetoothManager()
     private var bluetoothSocket: BluetoothSocket? = null
     private var messageProcessor: MessageProcessor? = null
+    private val isConnectingToBluetooth = AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,25 +32,33 @@ class MainActivity : AppCompatActivity() {
             bluetoothManager.getPairedDevices()
         }
 
-        connectToHC06Button.setOnClickListener {
-            bluetoothSocket = connectToUltraHC06()
-            messageProcessor = MessageProcessor(bluetoothSocket, ::onDataReceived)
-        }
+        connectToHC06Button.setOnClickListener { tryToConnectToBluetooth() }
 
         closeSocketButton.setOnClickListener { closeBluetoothSocket() }
 
-        startReceivingDataButton.setOnClickListener {
-            messageProcessor?.startReceivingData()
-        }
+        startReceivingDataButton.setOnClickListener { messageProcessor?.startReceivingData() }
 
-        stopReceivingDataButton.setOnClickListener {
-            messageProcessor?.stopReceivingData()
-        }
+        stopReceivingDataButton.setOnClickListener { messageProcessor?.stopReceivingData() }
 
-        startBeepButton.setOnClickListener {
-            messageProcessor?.startTone()
-        }
+        startBeepButton.setOnClickListener { messageProcessor?.startTone() }
+
         stopBeepButton.setOnClickListener { messageProcessor?.stopTone() }
+    }
+
+    private fun tryToConnectToBluetooth() {
+        if (isConnectingToBluetooth.compareAndSet(false, true)) {
+            connectingToBtInfoGroup.isVisible = true
+            CoroutineScope(Dispatchers.IO).launch {
+                connectToUltraHC06()?.let { socket ->
+                    bluetoothSocket = socket
+                    messageProcessor = MessageProcessor(bluetoothSocket, ::onDataReceived)
+                }
+                isConnectingToBluetooth.set(false)
+                runOnUiThread { connectingToBtInfoGroup.isVisible = false }
+            }
+        } else {
+            Toast.makeText(this, "Already connecting...", Toast.LENGTH_SHORT).show()
+        }
     }
 
 
@@ -54,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun connectToUltraHC06(): BluetoothSocket? {
+    private suspend fun connectToUltraHC06(): BluetoothSocket? {
         bluetoothManager.apply {
             getUltraHC06Device()?.let { device ->
                 val bluetoothSocket = connectToDevice(device)
@@ -68,7 +83,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun onDataReceived(receivedUnits: ReceivedUnits) {
         runOnUiThread {
-            distanceLabel.text = "hcsr04:\t ${receivedUnits.distanceCm} cm\n dht11:\t ${receivedUnits.dhtTemperatureC} °C\n d18b20:\t ${receivedUnits.d18b20TemperatureC} °C\n Solar:\t ${receivedUnits.solarPanelVoltage} V"
+            distanceLabel.text =
+                "hcsr04:\t ${receivedUnits.distanceCm} cm\n dht11:\t ${receivedUnits.dhtTemperatureC} °C\n d18b20:\t ${receivedUnits.d18b20TemperatureC} °C\n Solar:\t ${receivedUnits.solarPanelVoltage} V"
         }
     }
 
