@@ -11,7 +11,8 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int)
+data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int,
+                         val solarPanelVoltage: Float)
 
 class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
                        private val onDataReceived: (ReceivedUnits) -> Unit) {
@@ -48,6 +49,7 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
                         } catch (e: IOException) {
                             Log.e("ABAB", "error", e)
                             null
+                            //TODO should return if socket closed
                         }
 
                         receivedMessage?.let { rcvMsg ->
@@ -67,7 +69,17 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket?,
 
     private fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
         val splitMessage = cleanMessage.split(delimiter)
-        return ReceivedUnits(splitMessage[0].toInt(), splitMessage[1].toInt(), splitMessage[2].toInt())
+        for (msg in splitMessage) {
+            Log.d("ABAB", "..$msg..")
+        }
+        // Hotfix
+        val distanceCm = if (splitMessage[0].isNotEmpty()) {
+            splitMessage[0].toInt()
+        } else {
+            0
+        }
+        return ReceivedUnits(distanceCm, splitMessage[1].toInt(),
+            splitMessage[2].toInt(), splitMessage[3].toFloat())
     }
 
     /***
