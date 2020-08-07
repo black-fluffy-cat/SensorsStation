@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
                 connectToUltraHC06()?.let { socket ->
                     bluetoothSocket = socket
                     messageProcessor =
-                        MessageProcessor(socket, ::onDataReceived)
+                        MessageProcessor(socket, ::onDataReceived, ::onConnectionLost)
                 }
                 isConnectingToBluetooth.set(false)
                 runOnUiThread {

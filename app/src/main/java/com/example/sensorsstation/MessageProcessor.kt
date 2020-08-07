@@ -11,16 +11,20 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
+const val maxNumberOfContinuousIOErrors = 3
+
 data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int,
                          val solarPanelVoltage: Float)
 
 class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
-                       private val onDataReceived: (ReceivedUnits) -> Unit) {
+                       private val onDataReceived: (ReceivedUnits) -> Unit,
+                       private val onConnectionLost: () -> Unit) {
 
     private var fullMessageCentimeters = Int.MAX_VALUE
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 200)
     private val shouldReceiveData = AtomicBoolean(true)
     private val isReceivingData = AtomicBoolean(false)
+    private var numberOfContinuousIOErrors = 0
 
     private var partialMessage = ""
 
@@ -48,11 +52,15 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
                             String(receiveBuffer, 0, amountOfReceivedBytes)
                         } catch (e: IOException) {
                             Log.e("ABAB", "error", e)
+                            if (++numberOfContinuousIOErrors == maxNumberOfContinuousIOErrors) {
+                                onConnectionLost()
+                                break
+                            }
                             null
-                            //TODO should return if socket closed
                         }
 
                         receivedMessage?.let { rcvMsg ->
+                            numberOfContinuousIOErrors = 0
                             Log.d("ABAB", "message: $rcvMsg, length: " + "${rcvMsg.length}")
                             val cleanFullMessage = processReceivedMessage(receivedMessage)
                             cleanFullMessage?.let { message ->
