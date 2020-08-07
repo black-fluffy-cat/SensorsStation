@@ -90,13 +90,13 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:visibility="invisible"
-        app:layout_constraintEnd_toEndOf="@+id/connectingToBtLabel"
-        app:layout_constraintStart_toStartOf="@+id/connectingToBtLabel"
-        app:layout_constraintTop_toBottomOf="@+id/connectingToBtLabel"
+        app:layout_constraintEnd_toEndOf="@+id/connectingToBtStatusLabel"
+        app:layout_constraintStart_toStartOf="@+id/connectingToBtStatusLabel"
+        app:layout_constraintTop_toBottomOf="@+id/connectingToBtStatusLabel"
         tools:visibility="visible" />
 
     <TextView
-        android:id="@+id/connectingToBtLabel"
+        android:id="@+id/connectingToBtStatusLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
@@ -114,6 +114,6 @@
         android:layout_height="wrap_content"
         android:visibility="gone"
         tools:visibility="visible"
-        app:constraint_referenced_ids="connectingToBtProgressBar,connectingToBtLabel" />
+        app:constraint_referenced_ids="connectingToBtProgressBar,connectingToBtStatusLabel" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

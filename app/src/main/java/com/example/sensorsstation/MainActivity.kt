@@ -2,6 +2,7 @@ package com.example.sensorsstation
 
 import android.bluetooth.BluetoothSocket
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -51,16 +52,47 @@ class MainActivity : AppCompatActivity() {
             CoroutineScope(Dispatchers.IO).launch {
                 connectToUltraHC06()?.let { socket ->
                     bluetoothSocket = socket
-                    messageProcessor = MessageProcessor(socket, ::onDataReceived)
+                    messageProcessor =
+                        MessageProcessor(socket, ::onDataReceived)
                 }
                 isConnectingToBluetooth.set(false)
-                runOnUiThread { connectingToBtInfoGroup.isVisible = false }
+                runOnUiThread {
+                    connectingToBtProgressBar.isVisible = false
+                    if (bluetoothSocket != null) {
+                        onConnectionSuccessful()
+                    } else {
+                        onConnectingFailed()
+                    }
+                }
             }
         } else {
             Toast.makeText(this, "Already connecting...", Toast.LENGTH_SHORT).show()
         }
     }
 
+    private fun onConnectionSuccessful() {
+        connectingToBtStatusLabel.apply {
+            setTextColor(Color.GREEN)
+            text = "Connected"
+        }
+        Toast.makeText(this@MainActivity, "Connected", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun onConnectingFailed() {
+        connectingToBtStatusLabel.apply {
+            setTextColor(Color.RED)
+            text = "Connecting failed"
+        }
+        Toast.makeText(this@MainActivity, "Connecting failed", Toast.LENGTH_SHORT)
+            .show()
+    }
+
+    fun onConnectionLost() {
+        connectingToBtStatusLabel.apply {
+            setTextColor(Color.RED)
+            text = "Connection lost"
+        }
+    }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>,
                                             grantResults: IntArray) {
