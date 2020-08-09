@@ -41,38 +41,46 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
         if (isReceivingData.compareAndSet(false, true)) {
             startSpeakerThread()
             shouldReceiveData.set(true)
-            val receiveBuffer = ByteArray(1024)
-            CoroutineScope(Dispatchers.IO).launch {
-                withContext(Dispatchers.IO) {
-                    while (shouldReceiveData.get()) {
-                        Log.d("ABAB", "Trying to receive data...")
-                        val receivedMessage = try {
-                            val amountOfReceivedBytes =
-                                bluetoothSocket.inputStream.read(receiveBuffer)
-                            String(receiveBuffer, 0, amountOfReceivedBytes)
-                        } catch (e: IOException) {
-                            Log.e("ABAB", "error", e)
-                            if (++numberOfContinuousIOErrors == maxNumberOfContinuousIOErrors) {
-                                onConnectionLost()
-                                break
-                            }
-                            null
-                        }
+            startReceivingCoroutine()
+        }
+    }
 
-                        receivedMessage?.let { rcvMsg ->
-                            numberOfContinuousIOErrors = 0
-                            Log.d("ABAB", "message: $rcvMsg, length: " + "${rcvMsg.length}")
-                            val cleanFullMessage = processReceivedMessage(receivedMessage)
-                            cleanFullMessage?.let { message ->
-                                val receivedUnits = processCleanMessage(message)
-                                fullMessageCentimeters = receivedUnits.distanceCm
-                                onDataReceived(receivedUnits)
-                            }
+    private fun startReceivingCoroutine() {
+        val receiveBuffer = ByteArray(1024)
+        CoroutineScope(Dispatchers.IO).launch {
+            withContext(Dispatchers.IO) {
+                while (shouldReceiveData.get()) {
+                    Log.d("ABAB", "Trying to receive data...")
+                    val receivedMessage = receiveMessage(receiveBuffer)
+                    if (numberOfContinuousIOErrors == maxNumberOfContinuousIOErrors) {
+                        break
+                    }
+
+                    receivedMessage?.let { rcvMsg ->
+                        numberOfContinuousIOErrors = 0
+                        Log.d("ABAB", "message: $rcvMsg, length: " + "${rcvMsg.length}")
+                        val cleanFullMessage = processReceivedMessage(rcvMsg)
+                        cleanFullMessage?.let { message ->
+                            val receivedUnits = processCleanMessage(message)
+                            fullMessageCentimeters = receivedUnits.distanceCm
+                            onDataReceived(receivedUnits)
                         }
                     }
                 }
             }
         }
+    }
+
+    private fun receiveMessage(receiveBuffer: ByteArray) = try {
+        val amountOfReceivedBytes =
+            bluetoothSocket.inputStream.read(receiveBuffer)
+        String(receiveBuffer, 0, amountOfReceivedBytes)
+    } catch (e: IOException) {
+        Log.e("ABAB", "error", e)
+        if (++numberOfContinuousIOErrors == maxNumberOfContinuousIOErrors) {
+            onConnectionLost()
+        }
+        null
     }
 
     private fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
