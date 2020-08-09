@@ -1,10 +1,8 @@
 package com.example.sensorsstation
 
 import android.bluetooth.BluetoothSocket
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -17,7 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
 
-    private val bluetoothManager = BluetoothManager()
     private var bluetoothSocket: BluetoothSocket? = null
     private var messageProcessor: MessageProcessor? = null
     private val isConnectingToBluetooth = AtomicBoolean(false)
@@ -50,27 +47,24 @@ class MainActivity : AppCompatActivity() {
         if (isConnectingToBluetooth.compareAndSet(false, true)) {
             connectingToBtInfoGroup.isVisible = true
             CoroutineScope(Dispatchers.IO).launch {
-                connectToUltraHC06()?.let { socket ->
-                    bluetoothSocket = socket
-                    messageProcessor =
-                        MessageProcessor(socket, ::onDataReceived, ::onConnectionLost)
-                }
-                isConnectingToBluetooth.set(false)
-                runOnUiThread {
-                    connectingToBtProgressBar.isVisible = false
-                    if (bluetoothSocket != null) {
-                        onConnectionSuccessful()
-                    } else {
-                        onConnectingFailed()
-                    }
-                }
+                ConnectionManager().tryToConnect(::afterConnectionAttempt)
             }
         } else {
             Toast.makeText(this, "Already connecting...", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun onConnectionSuccessful() {
+    private fun afterConnectionAttempt(btSocket: BluetoothSocket?) {
+        bluetoothSocket = btSocket
+        runOnUiThread {
+            isConnectingToBluetooth.set(false)
+            connectingToBtProgressBar.isVisible = false
+            btSocket?.apply { onConnectionSuccessful(this) } ?: onConnectingFailed()
+        }
+    }
+
+    private fun onConnectionSuccessful(bluetoothSocket: BluetoothSocket) {
+        messageProcessor = MessageProcessor(bluetoothSocket, ::onDataReceived, ::onConnectionLost)
         connectingToBtStatusLabel.apply {
             setTextColor(Color.GREEN)
             text = "Connected"
@@ -87,30 +81,11 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    fun onConnectionLost() {
+    private fun onConnectionLost() {
         connectingToBtStatusLabel.apply {
             setTextColor(Color.RED)
             text = "Connection lost"
         }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>,
-                                            grantResults: IntArray) {
-        if (requestCode == REQUEST_BT_PERMISSIONS_CODE && grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            bluetoothManager.getPairedDevices()
-        }
-    }
-
-    private suspend fun connectToUltraHC06(): BluetoothSocket? {
-        bluetoothManager.apply {
-            getUltraHC06Device()?.let { device ->
-                val bluetoothSocket = connectToDevice(device)
-                Log.d("ABAB", "bluetoothSocket: $bluetoothSocket")
-                return bluetoothSocket
-            }
-        }
-        Log.e("ABAB", "getUltraHC06Device returning null")
-        return null
     }
 
     private fun onDataReceived(receivedUnits: ReceivedUnits) {
