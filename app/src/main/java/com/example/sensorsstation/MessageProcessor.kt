@@ -1,35 +1,22 @@
 package com.example.sensorsstation
 
-import android.bluetooth.BluetoothSocket
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
-const val maxNumberOfContinuousIOErrors = 3
 
 data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int,
                          val solarPanelVoltage: Float)
 
-class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
-                       private val onDataReceived: (ReceivedUnits) -> Unit,
-                       private val onConnectionLost: () -> Unit) {
+class MessageProcessor {
 
-    private var fullMessageCentimeters = Int.MAX_VALUE
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 200)
-    private val shouldReceiveData = AtomicBoolean(true)
-    private val isReceivingData = AtomicBoolean(false)
-    private var numberOfContinuousIOErrors = 0
-
+    private val speakerThreadShouldRun = AtomicBoolean(true)
     private var partialMessage = ""
+    private var fullMessageCentimeters = Int.MAX_VALUE
 
     fun startTone() {
-        Log.d("ABAB", "bt socket is: $bluetoothSocket")
         toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
     }
 
@@ -37,53 +24,8 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
         toneGenerator.stopTone()
     }
 
-    fun startReceivingData() {
-        if (isReceivingData.compareAndSet(false, true)) {
-            startSpeakerThread()
-            shouldReceiveData.set(true)
-            startReceivingCoroutine()
-        }
-    }
 
-    private fun startReceivingCoroutine() {
-        val receiveBuffer = ByteArray(1024)
-        CoroutineScope(Dispatchers.IO).launch {
-            withContext(Dispatchers.IO) {
-                while (shouldReceiveData.get()) {
-                    Log.d("ABAB", "Trying to receive data...")
-                    val receivedMessage = receiveMessage(receiveBuffer)
-                    if (numberOfContinuousIOErrors == maxNumberOfContinuousIOErrors) {
-                        break
-                    }
-
-                    receivedMessage?.let { rcvMsg ->
-                        numberOfContinuousIOErrors = 0
-                        Log.d("ABAB", "message: $rcvMsg, length: " + "${rcvMsg.length}")
-                        val cleanFullMessage = processReceivedMessage(rcvMsg)
-                        cleanFullMessage?.let { message ->
-                            val receivedUnits = processCleanMessage(message)
-                            fullMessageCentimeters = receivedUnits.distanceCm
-                            onDataReceived(receivedUnits)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun receiveMessage(receiveBuffer: ByteArray) = try {
-        val amountOfReceivedBytes =
-            bluetoothSocket.inputStream.read(receiveBuffer)
-        String(receiveBuffer, 0, amountOfReceivedBytes)
-    } catch (e: IOException) {
-        Log.e("ABAB", "error", e)
-        if (++numberOfContinuousIOErrors == maxNumberOfContinuousIOErrors) {
-            onConnectionLost()
-        }
-        null
-    }
-
-    private fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
+    fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
         val splitMessage = cleanMessage.split(delimiter)
         for (msg in splitMessage) {
             Log.d("ABAB", "..$msg..")
@@ -102,7 +44,7 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
      * @return message if message is complete, null if received message is partial
      *
      */
-    private fun processReceivedMessage(receivedMessage: String): String? {
+    fun processReceivedMessage(receivedMessage: String): String? {
         if (receivedMessage[receivedMessage.length - 1].toString() == "#") {
             var fullMessage = (partialMessage + receivedMessage)
             if (fullMessage.count { it.toString() == "#" } > 1) {
@@ -126,9 +68,10 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
         }
     }
 
-    private fun startSpeakerThread() {
+    fun startSpeakerThread() {
+        speakerThreadShouldRun.set(true)
         Thread {
-            while (isReceivingData.get()) {
+            while (speakerThreadShouldRun.get()) {
                 processMessageToSpeaker()
 //                Log.d("ABAB", "threadShouldRun is: ${threadShouldRun.get()}")
             }
@@ -138,21 +81,18 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
     }
 
     private fun processMessageToSpeaker() {
-        //TODO try catch
-        val centimeters = fullMessageCentimeters
-
         when {
-            centimeters <= 5 -> toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
-            centimeters > 70 -> toneGenerator.stopTone()
+            fullMessageCentimeters <= 5 -> toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
+            fullMessageCentimeters > 70 -> toneGenerator.stopTone()
             else -> {
                 var calculatedDelay = -1.0f
-                if ((centimeters > 5) && (centimeters <= 15)) {
+                if ((fullMessageCentimeters > 5) && (fullMessageCentimeters <= 15)) {
                     calculatedDelay = 1.0f / 9f
-                } else if ((centimeters > 15) && (centimeters <= 30)) {
+                } else if ((fullMessageCentimeters > 15) && (fullMessageCentimeters <= 30)) {
                     calculatedDelay = 1.0f / 6f
-                } else if ((centimeters > 30) && (centimeters <= 40)) {
+                } else if ((fullMessageCentimeters > 30) && (fullMessageCentimeters <= 40)) {
                     calculatedDelay = 1.0f / 4f
-                } else if ((centimeters > 40) && (centimeters <= 70)) {
+                } else if ((fullMessageCentimeters > 40) && (fullMessageCentimeters <= 70)) {
                     calculatedDelay = 1.0f / 2f
                 }
                 if (calculatedDelay != -1.0f) {
@@ -166,11 +106,14 @@ class MessageProcessor(private val bluetoothSocket: BluetoothSocket,
     }
 
     fun stopReceivingData() {
-        shouldReceiveData.set(false)
-        isReceivingData.set(false)
+        speakerThreadShouldRun.set(false)
     }
 
     fun destroy() {
         stopReceivingData()
+    }
+
+    fun setNewDistance(distance: Int) {
+        fullMessageCentimeters = distance
     }
 }

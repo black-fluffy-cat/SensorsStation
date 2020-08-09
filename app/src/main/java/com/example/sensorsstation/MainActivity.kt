@@ -12,12 +12,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
-
 class MainActivity : AppCompatActivity() {
 
     private var bluetoothSocket: BluetoothSocket? = null
     private var messageProcessor: MessageProcessor? = null
     private val isConnectingToBluetooth = AtomicBoolean(false)
+    private val connectionManager = ConnectionManager(::onDataReceived, ::onConnectionLost)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,9 +34,9 @@ class MainActivity : AppCompatActivity() {
 
         closeSocketButton.setOnClickListener { closeBluetoothSocket() }
 
-        startReceivingDataButton.setOnClickListener { messageProcessor?.startReceivingData() }
+        startReceivingDataButton.setOnClickListener { connectionManager.startReceivingData() }
 
-        stopReceivingDataButton.setOnClickListener { messageProcessor?.stopReceivingData() }
+        stopReceivingDataButton.setOnClickListener { connectionManager.stopReceivingData() }
 
         startBeepButton.setOnClickListener { messageProcessor?.startTone() }
 
@@ -47,7 +47,7 @@ class MainActivity : AppCompatActivity() {
         if (isConnectingToBluetooth.compareAndSet(false, true)) {
             connectingToBtInfoGroup.isVisible = true
             CoroutineScope(Dispatchers.IO).launch {
-                ConnectionManager().tryToConnect(::afterConnectionAttempt)
+                connectionManager.tryToConnect(::afterConnectionAttempt)
             }
         } else {
             Toast.makeText(this, "Already connecting...", Toast.LENGTH_SHORT).show()
@@ -59,12 +59,12 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             isConnectingToBluetooth.set(false)
             connectingToBtProgressBar.isVisible = false
-            btSocket?.apply { onConnectionSuccessful(this) } ?: onConnectingFailed()
+            btSocket?.apply { onConnectionSuccessful() } ?: onConnectingFailed()
         }
     }
 
-    private fun onConnectionSuccessful(bluetoothSocket: BluetoothSocket) {
-        messageProcessor = MessageProcessor(bluetoothSocket, ::onDataReceived, ::onConnectionLost)
+    private fun onConnectionSuccessful() {
+        messageProcessor = MessageProcessor()
         connectingToBtStatusLabel.apply {
             setTextColor(Color.GREEN)
             text = "Connected"
