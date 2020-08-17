@@ -95,4 +95,8 @@ class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
         }
         null
     }
+
+    fun sendInteger(number: Int) {
+        bluetoothSocket?.outputStream?.write(number)
+    }
 }

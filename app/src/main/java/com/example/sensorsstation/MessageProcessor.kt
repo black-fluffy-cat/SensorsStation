@@ -24,7 +24,6 @@ class MessageProcessor {
         toneGenerator.stopTone()
     }
 
-
     fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
         val splitMessage = cleanMessage.split(delimiter)
         for (msg in splitMessage) {

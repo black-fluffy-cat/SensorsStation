@@ -3,6 +3,7 @@ package com.example.sensorsstation
 import android.bluetooth.BluetoothSocket
 import android.graphics.Color
 import android.os.Bundle
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -41,6 +42,20 @@ class MainActivity : AppCompatActivity() {
         startBeepButton.setOnClickListener { messageProcessor?.startTone() }
 
         stopBeepButton.setOnClickListener { messageProcessor?.stopTone() }
+
+        ledBrightnessControlSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, p2: Boolean) {
+                connectionManager.sendInteger(progress)
+            }
+
+            override fun onStartTrackingTouch(p0: SeekBar?) {
+                // empty
+            }
+
+            override fun onStopTrackingTouch(p0: SeekBar?) {
+                // empty
+            }
+        })
     }
 
     private fun tryToConnectToBluetooth() {
@@ -69,6 +84,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.GREEN)
             text = "Connected"
         }
+        connectingToBtProgressBar.isVisible = false
         Toast.makeText(this@MainActivity, "Connected", Toast.LENGTH_SHORT).show()
     }
 
@@ -77,6 +93,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.RED)
             text = "Connecting failed"
         }
+        connectingToBtProgressBar.isVisible = false
         Toast.makeText(this@MainActivity, "Connecting failed", Toast.LENGTH_SHORT)
             .show()
     }
