@@ -19,3 +19,6 @@ fun checkBluetoothPermissions(context: Context): Boolean = permissions
 
 fun requestBluetoothPermissions(activity: Activity) =
     activity.requestPermissions(permissions, REQUEST_BT_PERMISSIONS_CODE)
+
+val Any.tag: String
+    get() = this.javaClass.simpleName

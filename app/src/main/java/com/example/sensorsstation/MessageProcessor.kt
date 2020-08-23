@@ -27,7 +27,7 @@ class MessageProcessor {
     fun processCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
         val splitMessage = cleanMessage.split(delimiter)
         for (msg in splitMessage) {
-            Log.d("ABAB", "..$msg..")
+            Log.d(tag, "..$msg..")
         }
         // Hotfix
         val distanceCm = if (splitMessage[0].isNotEmpty()) {
@@ -72,10 +72,9 @@ class MessageProcessor {
         Thread {
             while (speakerThreadShouldRun.get()) {
                 processMessageToSpeaker()
-//                Log.d("ABAB", "threadShouldRun is: ${threadShouldRun.get()}")
             }
             toneGenerator.stopTone()
-            Log.d("ABAB", "Thread is exiting")
+            Log.d(tag, "Thread is exiting")
         }.start()
     }
 

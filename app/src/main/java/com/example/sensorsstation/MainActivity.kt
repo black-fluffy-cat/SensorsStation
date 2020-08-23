@@ -7,6 +7,8 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import com.example.sensorsstation.bluetooth.BluetoothManager
+import com.example.sensorsstation.bluetooth.ConnectionManager
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +20,9 @@ class MainActivity : AppCompatActivity() {
     private var bluetoothSocket: BluetoothSocket? = null
     private var messageProcessor: MessageProcessor? = null
     private val isConnectingToBluetooth = AtomicBoolean(false)
-    private val connectionManager = ConnectionManager(::onDataReceived, ::onConnectionLost)
+    private val connectionManager =
+        ConnectionManager(::onDataReceived,
+            ::onConnectionLost)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +31,8 @@ class MainActivity : AppCompatActivity() {
         if (!checkBluetoothPermissions(this)) {
             requestBluetoothPermissions(this)
         } else {
-            val bluetoothManager = BluetoothManager()
+            val bluetoothManager =
+                BluetoothManager()
             bluetoothManager.getPairedDevices()
         }
 
@@ -45,7 +50,7 @@ class MainActivity : AppCompatActivity() {
 
         ledBrightnessControlSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, p2: Boolean) {
-                connectionManager.sendInteger(progress)
+                connectionManager.sendIntegerThroughBluetooth(progress)
             }
 
             override fun onStartTrackingTouch(p0: SeekBar?) {

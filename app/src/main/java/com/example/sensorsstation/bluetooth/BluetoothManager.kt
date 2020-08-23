@@ -1,11 +1,12 @@
-package com.example.sensorsstation
+package com.example.sensorsstation.bluetooth
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.util.Log
+import com.example.sensorsstation.tag
 import java.io.IOException
-import java.util.*
+import java.util.UUID
 
 
 class BluetoothManager {
@@ -17,7 +18,7 @@ class BluetoothManager {
         mBluetoothAdapter.cancelDiscovery()
         return try {
             bluetoothSocket?.connect()
-            Log.d("ABAB", "connectToDevice: after connect")
+            Log.d(tag, "connectToDevice: after connect")
             bluetoothSocket
         } catch (e: IOException) {
             e.printStackTrace()
@@ -28,7 +29,8 @@ class BluetoothManager {
     private fun createBluetoothSocket(device: BluetoothDevice): BluetoothSocket? {
         var bluetoothSocket: BluetoothSocket? = null
         try {
-            bluetoothSocket = device.createRfcommSocketToServiceRecord(UUID.fromString(device.uuids[0].toString()))
+            bluetoothSocket = device.createRfcommSocketToServiceRecord(
+                UUID.fromString(device.uuids[0].toString()))
         } catch (e: IOException) {
             e.printStackTrace()
         }
@@ -39,7 +41,7 @@ class BluetoothManager {
         val pairedDevices: Set<BluetoothDevice> = mBluetoothAdapter.bondedDevices
         if (pairedDevices.isNotEmpty()) {
             for (device in pairedDevices) {
-                Log.d("ABAB", "Paired device: ${device.name}, ${device.address}")
+                Log.d(tag, "Paired device: ${device.name}, ${device.address}")
             }
         }
         return pairedDevices
