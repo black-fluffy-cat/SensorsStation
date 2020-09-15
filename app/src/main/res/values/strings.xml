@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">SensorsStation</string>
+    <string name="connected">Connected</string>
+    <string name="connecting_failed">Connecting failed</string>
+    <string name="connection_lost">Connection lost</string>
+    <string name="already_connecting">Already connecting…</string>
 </resources>

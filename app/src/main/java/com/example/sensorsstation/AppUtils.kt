@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 
 const val REQUEST_BT_PERMISSIONS_CODE = 1000
@@ -22,3 +23,6 @@ fun requestBluetoothPermissions(activity: Activity) =
 
 val Any.tag: String
     get() = this.javaClass.simpleName
+
+fun showShortToast(context: Context, text: String) =
+    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()

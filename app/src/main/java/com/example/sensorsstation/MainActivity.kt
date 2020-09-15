@@ -4,7 +4,6 @@ import android.bluetooth.BluetoothSocket
 import android.graphics.Color
 import android.os.Bundle
 import android.widget.SeekBar
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import com.example.sensorsstation.bluetooth.BluetoothManager
@@ -20,9 +19,7 @@ class MainActivity : AppCompatActivity() {
     private var bluetoothSocket: BluetoothSocket? = null
     private var messageProcessor: MessageProcessor? = null
     private val isConnectingToBluetooth = AtomicBoolean(false)
-    private val connectionManager =
-        ConnectionManager(::onDataReceived,
-            ::onConnectionLost)
+    private val connectionManager = ConnectionManager(::onDataReceived, ::onConnectionLost)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,9 +28,7 @@ class MainActivity : AppCompatActivity() {
         if (!checkBluetoothPermissions(this)) {
             requestBluetoothPermissions(this)
         } else {
-            val bluetoothManager =
-                BluetoothManager()
-            bluetoothManager.getPairedDevices()
+            BluetoothManager().apply { getPairedDevices() }
         }
 
         connectToHC06Button.setOnClickListener { tryToConnectToBluetooth() }
@@ -48,16 +43,17 @@ class MainActivity : AppCompatActivity() {
 
         stopBeepButton.setOnClickListener { messageProcessor?.stopTone() }
 
-        ledBrightnessControlSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        ledBrightnessControlSeekBar.setOnSeekBarChangeListener(object :
+            SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, p2: Boolean) {
                 connectionManager.sendIntegerThroughBluetooth(progress)
             }
 
-            override fun onStartTrackingTouch(p0: SeekBar?) {
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
                 // empty
             }
 
-            override fun onStopTrackingTouch(p0: SeekBar?) {
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
                 // empty
             }
         })
@@ -70,7 +66,7 @@ class MainActivity : AppCompatActivity() {
                 connectionManager.tryToConnect(::afterConnectionAttempt)
             }
         } else {
-            Toast.makeText(this, "Already connecting...", Toast.LENGTH_SHORT).show()
+            showShortToast(this, getString(R.string.already_connecting))
         }
     }
 
@@ -85,29 +81,32 @@ class MainActivity : AppCompatActivity() {
 
     private fun onConnectionSuccessful() {
         messageProcessor = MessageProcessor()
+        val messageText = getString(R.string.connected)
         connectingToBtStatusLabel.apply {
             setTextColor(Color.GREEN)
-            text = "Connected"
+            text = messageText
         }
         connectingToBtProgressBar.isVisible = false
-        Toast.makeText(this@MainActivity, "Connected", Toast.LENGTH_SHORT).show()
+        showShortToast(this, messageText)
     }
 
     private fun onConnectingFailed() {
+        val messageText = getString(R.string.connecting_failed)
         connectingToBtStatusLabel.apply {
             setTextColor(Color.RED)
-            text = "Connecting failed"
+            text = messageText
         }
         connectingToBtProgressBar.isVisible = false
-        Toast.makeText(this@MainActivity, "Connecting failed", Toast.LENGTH_SHORT)
-            .show()
+        showShortToast(this, messageText)
     }
 
     private fun onConnectionLost() {
+        val messageText = getString(R.string.connection_lost)
         connectingToBtStatusLabel.apply {
             setTextColor(Color.RED)
-            text = "Connection lost"
+            text = messageText
         }
+        showShortToast(this, messageText)
     }
 
     private fun onDataReceived(receivedUnits: ReceivedUnits) {
