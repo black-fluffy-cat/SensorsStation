@@ -56,8 +56,8 @@ class MessageProcessorTest {
     }
 
     @Test
-    fun `getUnitsFromCleanMessage from partial message with hash`() {
-        val processedMsg = messageProcessor.processReceivedMessage(endOfPartialReceivedMessage)
+    fun `getUnitsFromCleanMessage from message with hash`() {
+        val processedMsg = messageProcessor.processReceivedMessage(firstReceivedMessage)
         val receivedUnits = messageProcessor.getUnitsFromCleanMessage(processedMsg!!)
         assertEquals(ReceivedUnits(1, 1, 1, 1F), receivedUnits)
     }

@@ -41,7 +41,8 @@ class MessageProcessor {
     // and # will never be last char
     // NPE occurs if there will come partial message with # on the end, i.e. "/1/1#"
     fun processReceivedMessage(receivedMessage: String): String? {
-        return if (receivedMessage.last() == '#') {
+        // fixme get 5 and #, / into consts
+        return if (receivedMessage.contains('#') && receivedMessage.split("/").size == 5) {
             var fullMessage = (partialMessage + receivedMessage)
             if (fullMessage.count { it == '#' } > 1) {
                 fullMessage = fullMessage.split("#").dropLast(1).last()
