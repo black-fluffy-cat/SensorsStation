@@ -78,6 +78,7 @@ class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
                         Log.d(tag, "message: $rcvMsg, length: " + "${rcvMsg.length}")
                         messageProcessor.processReceivedMessage(rcvMsg)?.let { cleanMessage ->
                             val receivedUnits = messageProcessor.getUnitsFromCleanMessage(cleanMessage)
+                            Log.d(tag, receivedUnits.toString())
                             messageProcessor.setNewDistance(receivedUnits.distanceCm)
                             onCleanFullMessageReceived(receivedUnits)
                         }

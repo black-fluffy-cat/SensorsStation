@@ -22,9 +22,6 @@ class MessageProcessor {
 
     fun getUnitsFromCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
         val splitMessage = cleanMessage.split(delimiter)
-        for (msg in splitMessage) {
-            Log.d(tag, "..$msg..")
-        }
         // Hotfix, first position may be empty sometimes, other positions also but less often
         val distanceCm = if (splitMessage[0].isNotEmpty()) {
             splitMessage[0].toInt()
@@ -47,14 +44,7 @@ class MessageProcessor {
         return if (receivedMessage.last() == '#') {
             var fullMessage = (partialMessage + receivedMessage)
             if (fullMessage.count { it == '#' } > 1) {
-                var positionOfAlmostLastHash = 0
-                for (i in fullMessage.length - 2 downTo 0) {
-                    if (fullMessage[i] == '#') {
-                        positionOfAlmostLastHash = i
-                        break
-                    }
-                }
-                fullMessage = fullMessage.substring(positionOfAlmostLastHash, fullMessage.length)
+                fullMessage = fullMessage.split("#").dropLast(1).last()
             }
             val cleanLastFullMessage = fullMessage.replace("#", "")
             partialMessage = ""
