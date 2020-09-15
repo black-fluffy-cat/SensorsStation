@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothSocket
 import android.util.Log
 import com.example.sensorsstation.MessageProcessor
 import com.example.sensorsstation.ReceivedUnits
+import com.example.sensorsstation.rest.DefaultCallback
 import com.example.sensorsstation.rest.SensorsData
 import com.example.sensorsstation.rest.SensorsDataCall
 import com.example.sensorsstation.tag
@@ -11,14 +12,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.ResponseBody
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
 const val maxNumberOfContinuousIOErrors = 3
+const val messageLimiterCounter = 5
 
 class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
                         private val onConnectionLost: () -> Unit) {
@@ -43,9 +41,9 @@ class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
     private fun connectToUltraHC06(): BluetoothSocket? {
         bluetoothManager.apply {
             getUltraHC06Device()?.let { device ->
-                val bluetoothSocket = connectToDevice(device)
-                Log.d(tag, "bluetoothSocket: $bluetoothSocket")
-                return bluetoothSocket
+                return connectToDevice(device).apply {
+                    Log.d(tag, "bluetoothSocket: $bluetoothSocket")
+                }
             }
         }
         Log.e(tag, "getUltraHC06Device returning null")
@@ -64,6 +62,7 @@ class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
     }
 
     private fun startReceivingCoroutine(btSocket: BluetoothSocket) {
+        // Leak by passing object to coroutine?
         val receiveBuffer = ByteArray(1024)
         CoroutineScope(Dispatchers.IO).launch {
             withContext(Dispatchers.IO) {
@@ -77,9 +76,8 @@ class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
                     receivedMessage?.let { rcvMsg ->
                         numberOfContinuousIOErrors = 0
                         Log.d(tag, "message: $rcvMsg, length: " + "${rcvMsg.length}")
-                        val cleanFullMessage = messageProcessor.processReceivedMessage(rcvMsg)
-                        cleanFullMessage?.let { message ->
-                            val receivedUnits = messageProcessor.processCleanMessage(message)
+                        messageProcessor.processReceivedMessage(rcvMsg)?.let { cleanMessage ->
+                            val receivedUnits = messageProcessor.getUnitsFromCleanMessage(cleanMessage)
                             messageProcessor.setNewDistance(receivedUnits.distanceCm)
                             onCleanFullMessageReceived(receivedUnits)
                         }
@@ -91,24 +89,22 @@ class ConnectionManager(private val onDataReceived: (ReceivedUnits) -> Unit,
 
     private fun onCleanFullMessageReceived(receivedUnits: ReceivedUnits) {
         onDataReceived(receivedUnits)
-        if (++clearFullMessageCounter % 5 == 0) {
+        // I want to send every fifth message to server
+        if (++clearFullMessageCounter % messageLimiterCounter == 0) {
             clearFullMessageCounter = 0
-            CoroutineScope(Dispatchers.IO).launch {
-                SensorsDataCall.postSensorsData(SensorsData(
-                    "hcsr04: ${receivedUnits.distanceCm} cm, dht11: ${receivedUnits.dhtTemperatureC} °C, d18b20: ${receivedUnits.d18b20TemperatureC} °C, Solar: ${receivedUnits.solarPanelVoltage} V"),
-                    object : Callback<ResponseBody> {
-                        override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
-                            Log.e(tag, "Sending units to server failed", t)
-                        }
-
-                        override fun onResponse(call: Call<ResponseBody>,
-                                                response: Response<ResponseBody>) {
-                            Log.d(tag, "Sending to server successful, response: $response")
-                        }
-                    })
-            }
+            sendUnitsToServer(receivedUnits)
         }
     }
+
+    private fun sendUnitsToServer(receivedUnits: ReceivedUnits) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val sensorsData = SensorsData(createSensorsDataMessage(receivedUnits))
+            SensorsDataCall.postSensorsData(sensorsData, DefaultCallback())
+        }
+    }
+
+    private fun createSensorsDataMessage(receivedUnits: ReceivedUnits): String =
+        "hcsr04: ${receivedUnits.distanceCm} cm, dht11: ${receivedUnits.dhtTemperatureC} °C, d18b20: ${receivedUnits.d18b20TemperatureC} °C, Solar: ${receivedUnits.solarPanelVoltage} V"
 
     fun stopReceivingData() {
         shouldReceiveData.set(false)
