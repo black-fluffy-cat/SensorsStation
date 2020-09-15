@@ -1,9 +1,7 @@
 package com.example.sensorsstation
 
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.util.Log
-import java.util.concurrent.atomic.AtomicBoolean
+import com.example.sensorsstation.threads.SpeakerThread
 
 
 data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b20TemperatureC: Int,
@@ -11,17 +9,15 @@ data class ReceivedUnits(val distanceCm: Int, val dhtTemperatureC: Int, val d18b
 
 class MessageProcessor {
 
-    private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 200)
-    private val speakerThreadShouldRun = AtomicBoolean(true)
     private var partialMessage = ""
-    private var fullMessageCentimeters = Int.MAX_VALUE
+    private val speakerThread = SpeakerThread()
 
     fun startTone() {
-        toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
+        speakerThread.startTone()
     }
 
     fun stopTone() {
-        toneGenerator.stopTone()
+        speakerThread.stopTone()
     }
 
     fun getUnitsFromCleanMessage(cleanMessage: String, delimiter: String = "/"): ReceivedUnits {
@@ -29,7 +25,7 @@ class MessageProcessor {
         for (msg in splitMessage) {
             Log.d(tag, "..$msg..")
         }
-        // Hotfix
+        // Hotfix, first position may be empty sometimes, other positions also but less often
         val distanceCm = if (splitMessage[0].isNotEmpty()) {
             splitMessage[0].toInt()
         } else {
@@ -43,68 +39,40 @@ class MessageProcessor {
      * @return message if message is complete, null if received message is partial
      *
      */
+    // fixme Possible bug and NPE exception is described below and with more details on my paper
+    // This works only if last char is #, we can always receive messages split in half
+    // and # will never be last char
+    // NPE occurs if there will come partial message with # on the end, i.e. "/1/1#"
     fun processReceivedMessage(receivedMessage: String): String? {
-        if (receivedMessage[receivedMessage.length - 1].toString() == "#") {
+        return if (receivedMessage.last() == '#') {
             var fullMessage = (partialMessage + receivedMessage)
-            if (fullMessage.count { it.toString() == "#" } > 1) {
-                val fullMessageLength = fullMessage.length
+            if (fullMessage.count { it == '#' } > 1) {
                 var positionOfAlmostLastHash = 0
-                for (i in fullMessageLength - 2 downTo 0) {
-                    if (fullMessage[i].toString() == "#") {
+                for (i in fullMessage.length - 2 downTo 0) {
+                    if (fullMessage[i] == '#') {
                         positionOfAlmostLastHash = i
                         break
                     }
                 }
-                fullMessage = fullMessage.substring(positionOfAlmostLastHash,
-                    fullMessageLength)
+                fullMessage = fullMessage.substring(positionOfAlmostLastHash, fullMessage.length)
             }
             val cleanLastFullMessage = fullMessage.replace("#", "")
             partialMessage = ""
-            return cleanLastFullMessage
+            cleanLastFullMessage
         } else {
             partialMessage = receivedMessage
-            return null
+            null
         }
     }
 
     fun startSpeakerThread() {
-        speakerThreadShouldRun.set(true)
-        Thread {
-            while (speakerThreadShouldRun.get()) {
-                processMessageToSpeaker()
-            }
-            toneGenerator.stopTone()
-            Log.d(tag, "Thread is exiting")
-        }.start()
+        // fixme Can interrupted thread start again?
+        speakerThread.start()
     }
 
-    private fun processMessageToSpeaker() {
-        when {
-            fullMessageCentimeters <= 5 -> toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
-            fullMessageCentimeters > 70 -> toneGenerator.stopTone()
-            else -> {
-                var calculatedDelay = -1.0f
-                if ((fullMessageCentimeters > 5) && (fullMessageCentimeters <= 15)) {
-                    calculatedDelay = 1.0f / 9f
-                } else if ((fullMessageCentimeters > 15) && (fullMessageCentimeters <= 30)) {
-                    calculatedDelay = 1.0f / 6f
-                } else if ((fullMessageCentimeters > 30) && (fullMessageCentimeters <= 40)) {
-                    calculatedDelay = 1.0f / 4f
-                } else if ((fullMessageCentimeters > 40) && (fullMessageCentimeters <= 70)) {
-                    calculatedDelay = 1.0f / 2f
-                }
-                if (calculatedDelay != -1.0f) {
-                    toneGenerator.startTone(ToneGenerator.TONE_SUP_DIAL)
-                    Thread.sleep((calculatedDelay * 500).toLong())
-                    toneGenerator.stopTone()
-                    Thread.sleep((calculatedDelay * 500).toLong())
-                }
-            }
-        }
-    }
 
     fun stopReceivingData() {
-        speakerThreadShouldRun.set(false)
+        speakerThread.interrupt()
     }
 
     fun destroy() {
@@ -112,6 +80,6 @@ class MessageProcessor {
     }
 
     fun setNewDistance(distance: Int) {
-        fullMessageCentimeters = distance
+        speakerThread.setFullMessageCentimeters(distance)
     }
 }
