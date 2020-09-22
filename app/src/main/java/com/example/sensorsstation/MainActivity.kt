@@ -3,6 +3,7 @@ package com.example.sensorsstation
 import android.bluetooth.BluetoothSocket
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -28,7 +29,9 @@ class MainActivity : AppCompatActivity() {
         if (!checkBluetoothPermissions(this)) {
             requestBluetoothPermissions(this)
         } else {
-            BluetoothManager().apply { getPairedDevices() }
+            BluetoothManager().getPairedDevices().forEach {
+                Log.d(tag, "Paired device: ${it.name}, ${it.address}")
+            }
         }
 
         connectToHC06Button.setOnClickListener { tryToConnectToBluetooth() }

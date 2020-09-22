@@ -8,6 +8,7 @@ import com.example.sensorsstation.tag
 import java.io.IOException
 import java.util.UUID
 
+const val ultraHC06Name = "ultraHC06"
 
 class BluetoothManager {
 
@@ -27,25 +28,15 @@ class BluetoothManager {
     }
 
     private fun createBluetoothSocket(device: BluetoothDevice): BluetoothSocket? {
-        var bluetoothSocket: BluetoothSocket? = null
-        try {
-            bluetoothSocket = device.createRfcommSocketToServiceRecord(
-                UUID.fromString(device.uuids[0].toString()))
+        return try {
+            device.createRfcommSocketToServiceRecord(UUID.fromString(device.uuids[0].toString()))
         } catch (e: IOException) {
             e.printStackTrace()
+            null
         }
-        return bluetoothSocket
     }
 
-    fun getPairedDevices(): Set<BluetoothDevice> {
-        val pairedDevices: Set<BluetoothDevice> = mBluetoothAdapter.bondedDevices
-        if (pairedDevices.isNotEmpty()) {
-            for (device in pairedDevices) {
-                Log.d(tag, "Paired device: ${device.name}, ${device.address}")
-            }
-        }
-        return pairedDevices
-    }
+    fun getPairedDevices(): Set<BluetoothDevice> = mBluetoothAdapter.bondedDevices
 
-    fun getUltraHC06Device() = getPairedDevices().find { it.name == "ultraHC06" }
+    fun getUltraHC06Device() = getPairedDevices().find { it.name == ultraHC06Name }
 }
